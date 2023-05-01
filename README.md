@@ -6,6 +6,8 @@ Manager recurring tasks from within Home Assistant
 
 Use the companion [Activity Manager Card](https://github.com/pathofleastresistor/activity-manager-card) for the best experience.
 
+The core idea is that an activity happens on a recurring basis, which is stored in the `frequency` field when adding an activity. By default, the activity is last completed when you first add the activity and then the timer can be reset.
+
 ## Installation
 
 ### Manually
@@ -26,3 +28,7 @@ Once installed, you can use the link below to add the integration from the UI.
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=activity_manager)
 
+## More information
+* Activities are stored in .activities_list.json in your `<config>` folder
+* An entity is created for each activity (e.g. `activity_manager.<category>_<activity>`). The state of the activity is when the activity is due. You can use this entity to build notifications or your own custom cards.
+* Three services are exposed: `activity_manager.add_activity`, `activity_manager.update_activity`, `activity_manager.remove_activity`. The update activity can be used to reset the timer.

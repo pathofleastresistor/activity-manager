@@ -21,7 +21,7 @@ Using the [Activity Manager Card](https://github.com/pathofleastresistor/activit
 
 Services are exposed for you to manage your activities.
 <p align="center">
-  <img width="300" src="images/service.png">
+  <img width="600" src="images/service.png">
 </p>
 
 ## Installation

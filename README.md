@@ -10,14 +10,19 @@ Use the companion [Activity Manager Card](https://github.com/pathofleastresistor
 The core idea is that an activity happens on a recurring basis, which is stored in the `frequency` field when adding an activity. By default, the activity is last completed when you first add the activity and then the timer can be reset.
 
 ## User Interface
-Using the [Activity Manager Card](https://github.com/pathofleastresistor/activity-manager-card) you show your activities and click the "Did it!" button to reset the timer.
-![](images/basic.png)
+Using the [Activity Manager Card](https://github.com/pathofleastresistor/activity-manager-card) you show your activities and click the "Did it!" button to reset the timer.<p align="center">
+  <img width="300" src="images/basic.png">
+</p>
 
 Using the [Activity Manager Card](https://github.com/pathofleastresistor/activity-manager-card) you can manage activities directly from the UI.
-![](images/manager.png)
+<p align="center">
+  <img width="300" src="images/manager.png">
+</p>
 
 Services are exposed for you to manage your activities.
-![](images/service.png)
+<p align="center">
+  <img width="300" src="images/services.png">
+</p>
 
 ## Installation
 

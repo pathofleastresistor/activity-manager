@@ -135,7 +135,7 @@ async def async_setup_entry(
     websocket_api.async_register_command(hass, websocket_handle_update)
     websocket_api.async_register_command(hass, websocket_handle_remove)
 
-    hass.helpers.discovery.load_platform("sensor", DOMAIN, {}, config_entry)
+    # hass.helpers.discovery.load_platform("sensor", DOMAIN, {}, config_entry)
 
     return True
 

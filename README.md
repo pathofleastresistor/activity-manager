@@ -2,11 +2,22 @@
 This was designed to solve a personal need and I'm now trying to prepare it for others to use. That means several things can break between releases.
 
 # activity-manager
+
 Manager recurring tasks from within Home Assistant
 
 Use the companion [Activity Manager Card](https://github.com/pathofleastresistor/activity-manager-card) for the best experience.
 
 The core idea is that an activity happens on a recurring basis, which is stored in the `frequency` field when adding an activity. By default, the activity is last completed when you first add the activity and then the timer can be reset.
+
+## User Interface
+Using the [Activity Manager Card](https://github.com/pathofleastresistor/activity-manager-card) you show your activities and click the "Did it!" button to reset the timer.
+![](images/basic.png)
+
+Using the [Activity Manager Card](https://github.com/pathofleastresistor/activity-manager-card) you can manage activities directly from the UI.
+![](images/manager.png)
+
+Services are exposed for you to manage your activities.
+![](images/service.png)
 
 ## Installation
 

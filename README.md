@@ -37,7 +37,8 @@ Clone or download this repository and copy the "nfl" directory to your "custom_c
 1. Open the HACS section of Home Assistant.
 2. Click the "..." button in the top right corner and select "Custom Repositories."
 3. In the window that opens paste this Github URL.
-4. In the window that opens when you select it click om "Install This Repository in HACS"
+4. Select "Integration"
+5. In the window that opens when you select it click om "Install This Repository in HACS"
 
 ## Usage
 Once installed, you can use the link below to add the integration from the UI.

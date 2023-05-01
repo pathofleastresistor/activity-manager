@@ -1,0 +1,82 @@
+add_activity:
+  name: Add activity
+  description: Add an activity to the list.
+  fields:
+    name:
+      name: Name
+      description: The name of the item to add.
+      required: true
+      example: Running
+      selector:
+        text:
+    category:
+      name: Category
+      description: The name of the item to add.
+      required: true
+      example: Workout
+      selector:
+        text:
+    frequency:
+      name: Frequency
+      description: The frequency of the activity
+      required: true
+      example: 7
+      selector:
+        number:
+          min: 0
+          max: 5000
+    last_completed:
+      name: Last Completed
+      description: Last time the activity was done
+      required: false
+      selector:
+        datetime:
+    icon:
+      name: Icon
+      required: false
+      selector:
+        icon:
+
+remove_activity:
+  name: Remove Activity
+  description: Remove the first item with matching name from the list.
+  fields:
+    name:
+      name: Name
+      description: The name of the item to remove.
+      required: true
+      example: Running
+      selector:
+        text:
+    category:
+      name: Category
+      description: The name of the item to add.
+      required: true
+      example: Workout
+      selector:
+        text:
+
+update_activity:
+  name: Update Activity
+  description: Update the first item with matching name from the list.
+  fields:
+    name:
+      name: Name
+      description: The name of the item to remove.
+      required: true
+      example: Running
+      selector:
+        text:
+    category:
+      name: Category
+      description: The name of the item to add.
+      required: true
+      example: Workout
+      selector:
+        text:
+    last_completed:
+      name: Last Completed
+      description: Last time the activity was done
+      required: false
+      selector:
+        datetime:

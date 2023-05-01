@@ -1,0 +1,1 @@
+DOMAIN = "activity_manager"

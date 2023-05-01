@@ -1,0 +1,12 @@
+{
+    "domain": "activity_manager",
+    "name": "Activity Manager",
+    "documentation": "https://example.com",
+    "config_flow": true,
+    "dependencies": [],
+    "codeowners": [],
+    "version": "1.0",
+    "description": "A simple custom component that prints a message to the console.",
+    "requirements": [],
+    "iot_class": "assumed_state"
+  }

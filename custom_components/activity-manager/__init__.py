@@ -44,7 +44,7 @@ async def async_setup_entry(
 
     data = hass.data[DOMAIN] = ActivityManager(hass)
     await data.async_load_activities()
-    await update_entities(hass, data.items)
+    await data.update_entities(data.items)
 
     async def add_item_service(call: ServiceCall) -> None:
         """Add an item with `name`."""
@@ -95,47 +95,108 @@ async def async_setup_entry(
     hass.services.async_register(DOMAIN, "remove_activity", remove_item_service)
     hass.services.async_register(DOMAIN, "update_activity", update_item_service)
 
+    @callback
+    @websocket_api.websocket_command(
+        {
+            vol.Required("type"): "activity_manager/items",
+            vol.Optional("category"): str
+        }
+    )
+    def websocket_handle_items(
+        hass: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+    ) -> None:
+        """Handle getting activity_manager items."""
+        connection.send_message(
+            websocket_api.result_message(msg["id"], hass.data[DOMAIN].items)
+        )
+
+    @websocket_api.websocket_command(
+        {
+            vol.Required("type"): "activity_manager/add",
+            vol.Required("name"): str,
+            vol.Required("category"): str,
+            vol.Required("frequency"): int,
+        }
+    )
+    @websocket_api.async_response
+    async def websocket_handle_add(
+        hass: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+    ) -> None:
+        """Handle updating activity."""
+        id = msg.pop("id")
+        name = msg.pop("name")
+        category = msg.pop("category")
+        frequency = msg.pop("frequency")
+        msg.pop("type")
+
+        item = await hass.data[DOMAIN].async_add_activity(
+            name, category, frequency, connection.context(msg)
+        )
+        connection.send_message(websocket_api.result_message(id, item))
+
+    @websocket_api.websocket_command(
+        {
+            vol.Required("type"): "activity_manager/update",
+            vol.Required("item_id"): str,
+            vol.Optional("last_completed"): str,
+            vol.Optional("name"): str,
+            vol.Optional("category"): str,
+            vol.Optional("frequency"): int,
+        }
+    )
+    @websocket_api.async_response
+    async def websocket_handle_update(
+        hass: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+    ) -> None:
+        """Handle updating activity."""
+        msg_id = msg.pop("id")
+        item_id = msg.pop("item_id")
+        msg.pop("type")
+        data = msg
+
+        item = await hass.data[DOMAIN].async_update_activity(
+            item_id, connection.context(msg)
+        )
+        connection.send_message(websocket_api.result_message(msg_id, item))
+
+    @websocket_api.websocket_command(
+        {
+            vol.Required("type"): "activity_manager/remove",
+            vol.Required("item_id"): str,
+        }
+    )
+    @websocket_api.async_response
+    async def websocket_handle_remove(
+        hass: HomeAssistant,
+        connection: websocket_api.ActiveConnection,
+        msg: dict[str, Any],
+    ) -> None:
+        """Handle removing activity."""
+        msg_id = msg.pop("id")
+        item_id = msg.pop("item_id")
+        msg.pop("type")
+        data = msg
+
+        item = await hass.data[DOMAIN].async_remove_activity(
+            item_id, connection.context(msg)
+        )
+        connection.send_message(websocket_api.result_message(msg_id, item))
+
     websocket_api.async_register_command(hass, websocket_handle_items)
     websocket_api.async_register_command(hass, websocket_handle_add)
     websocket_api.async_register_command(hass, websocket_handle_update)
     websocket_api.async_register_command(hass, websocket_handle_remove)
 
     # hass.helpers.discovery.load_platform("sensor", DOMAIN, {}, config_entry)
-    def test(self):
-        _LOGGER.error("triggered")
-
     # async_track_time_interval(hass, test, timedelta(seconds=2))
 
     return True
-
-
-async def update_entities(hass: HomeAssistant, items):
-    for item in items:
-        await update_entity(hass, item)
-
-
-async def update_entity(hass: HomeAssistant, item):
-    entity_name = slugify(item["category"] + "_" + item["name"])
-    entity_id = f"{DOMAIN}.{entity_name}"
-    hass.states.async_set(
-        entity_id,
-        datetime.fromisoformat(item["last_completed"])
-        + timedelta(days=item["frequency"]),
-        {
-            "name": item["name"],
-            "friendly_name": item["name"],
-            "category": item["category"],
-            "last_completed": item["last_completed"],
-            "frequency": item["frequency"],
-        },
-    )
-
-
-async def remove_entity(hass: HomeAssistant, item):
-    entity_name = item["name"].lower().replace(" ", "_")
-    entity_category = item["category"].lower().replace(" ", "_")
-    entity_id = f"{DOMAIN}.{entity_category}_{entity_name}"
-    hass.states.async_remove(entity_id)
 
 
 class ActivityManager:
@@ -148,7 +209,6 @@ class ActivityManager:
         self.items: JsonArrayType = []
 
     async def async_add_activity(self, name, category, frequency, context=None):
-        """Add a shopping list item."""
         item = {
             "name": name,
             "category": category,
@@ -157,7 +217,7 @@ class ActivityManager:
             "frequency": int(frequency),
         }
         self.items.append(item)
-        await update_entity(self.hass, item)
+        await self.update_entity(item)
         await self.hass.async_add_executor_job(self.save)
         self.hass.bus.async_fire(
             "activity_manager_updated",
@@ -168,14 +228,13 @@ class ActivityManager:
         return item
 
     async def async_remove_activity(self, item_id, context=None):
-        """Remove a shopping list item."""
         item = next((itm for itm in self.items if itm["id"] == item_id), None)
 
         # if item is None:
         #     raise NoMatchingShoppingListItem
 
         self.items.remove(item)
-        await remove_entity(self.hass, item)
+        await self.remove_entity(item)
         await self.hass.async_add_executor_job(self.save)
         self.hass.bus.async_fire(
             "activity_manager_updated",
@@ -186,11 +245,10 @@ class ActivityManager:
         return item
 
     async def async_update_activity(self, item_id, context=None):
-        """Update a shopping list item."""
         item = next((itm for itm in self.items if itm["id"] == item_id), None)
 
         item.update({"last_completed": datetime.now().isoformat()})
-        await update_entity(self.hass, item)
+        await self.update_entity(item)
         await self.hass.async_add_executor_job(self.save)
 
         self.hass.bus.async_fire(
@@ -199,6 +257,31 @@ class ActivityManager:
             context=context,
         )
         return item
+
+    async def update_entities(self, items):
+        for item in items:
+            await self.update_entity(item)
+
+    async def update_entity(self, item):
+        entity_name = slugify(item["category"] + "_" + item["name"])
+        entity_id = f"{DOMAIN}.{entity_name}"
+        self.hass.states.async_set(
+            entity_id,
+            datetime.fromisoformat(item["last_completed"])
+            + timedelta(days=item["frequency"]),
+            {
+                "name": item["name"],
+                "friendly_name": item["name"],
+                "category": item["category"],
+                "last_completed": item["last_completed"],
+                "frequency": item["frequency"],
+            },
+        )
+
+    async def remove_entity(self, item):
+        entity_name = slugify(item["category"] + "_" + item["name"])
+        entity_id = f"{DOMAIN}.{entity_name}"
+        self.hass.states.async_remove(entity_id)
 
     async def async_load_activities(self) -> None:
         """Load items."""
@@ -212,91 +295,3 @@ class ActivityManager:
     def save(self) -> None:
         """Save the items."""
         save_json(self.hass.config.path(PERSISTENCE), self.items)
-
-
-@callback
-@websocket_api.websocket_command({vol.Required("type"): "activity_manager/items"})
-def websocket_handle_items(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
-) -> None:
-    """Handle getting activity_manager items."""
-    connection.send_message(
-        websocket_api.result_message(msg["id"], hass.data[DOMAIN].items)
-    )
-
-
-@websocket_api.websocket_command(
-    {
-        vol.Required("type"): "activity_manager/add",
-        vol.Required("name"): str,
-        vol.Required("category"): str,
-        vol.Required("frequency"): int,
-    }
-)
-@websocket_api.async_response
-async def websocket_handle_add(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
-) -> None:
-    """Handle updating activity."""
-    id = msg.pop("id")
-    name = msg.pop("name")
-    category = msg.pop("category")
-    frequency = msg.pop("frequency")
-    msg.pop("type")
-
-    item = await hass.data[DOMAIN].async_add_activity(
-        name, category, frequency, connection.context(msg)
-    )
-    connection.send_message(websocket_api.result_message(id, item))
-
-
-@websocket_api.websocket_command(
-    {
-        vol.Required("type"): "activity_manager/update",
-        vol.Required("item_id"): str,
-    }
-)
-@websocket_api.async_response
-async def websocket_handle_update(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
-) -> None:
-    """Handle updating activity."""
-    msg_id = msg.pop("id")
-    item_id = msg.pop("item_id")
-    msg.pop("type")
-    data = msg
-
-    item = await hass.data[DOMAIN].async_update_activity(
-        item_id, connection.context(msg)
-    )
-    connection.send_message(websocket_api.result_message(msg_id, item))
-
-
-@websocket_api.websocket_command(
-    {
-        vol.Required("type"): "activity_manager/remove",
-        vol.Required("item_id"): str,
-    }
-)
-@websocket_api.async_response
-async def websocket_handle_remove(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict[str, Any],
-) -> None:
-    """Handle removing activity."""
-    msg_id = msg.pop("id")
-    item_id = msg.pop("item_id")
-    msg.pop("type")
-    data = msg
-
-    item = await hass.data[DOMAIN].async_remove_activity(
-        item_id, connection.context(msg)
-    )
-    connection.send_message(websocket_api.result_message(msg_id, item))

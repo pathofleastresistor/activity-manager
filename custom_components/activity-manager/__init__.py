@@ -161,6 +161,11 @@ class ActivityManager:
         self.items.append(item)
         await update_entity(self.hass, item)
         await self.hass.async_add_executor_job(self.save)
+        self.hass.bus.async_fire(
+            "activity_manager_updated",
+            {"action": "add", "item": item},
+            context=context,
+        )
 
         return item
 
@@ -174,6 +179,11 @@ class ActivityManager:
         self.items.remove(item)
         await remove_entity(self.hass, item)
         await self.hass.async_add_executor_job(self.save)
+        self.hass.bus.async_fire(
+            "activity_manager_updated",
+            {"action": "remove", "item": item},
+            context=context,
+        )
 
         return item
 
@@ -189,6 +199,11 @@ class ActivityManager:
         await update_entity(self.hass, item)
         await self.hass.async_add_executor_job(self.save)
 
+        self.hass.bus.async_fire(
+            "activity_manager_updated",
+            {"action": "updated", "item": item},
+            context=context,
+        )
         return item
 
     async def async_load_activities(self) -> None:

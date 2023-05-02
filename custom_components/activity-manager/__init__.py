@@ -2,23 +2,18 @@ from __future__ import annotations
 from typing import Any
 from datetime import datetime, timedelta
 import logging
-import os
-import json
 import voluptuous as vol
 import uuid
 from homeassistant.helpers.json import save_json
 from homeassistant.components import websocket_api
-from homeassistant.components.binary_sensor import BinarySensorEntity
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.entity import Entity
 from homeassistant.util.json import JsonArrayType, load_json_array
 from homeassistant import config_entries
-from homeassistant.const import ATTR_NAME
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.util import slugify
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -39,36 +34,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     )
 
     return True
-
-
-async def update_entities(hass: HomeAssistant, items):
-    for item in items:
-        await update_entity(hass, item)
-
-
-async def update_entity(hass: HomeAssistant, item):
-    entity_name = item["name"].lower().replace(" ", "_")
-    entity_category = item["category"].lower().replace(" ", "_")
-    entity_id = f"{DOMAIN}.{entity_category}_{entity_name}"
-    hass.states.async_set(
-        entity_id,
-        datetime.fromisoformat(item["last_completed"])
-        + timedelta(days=item["frequency"]),
-        {
-            "name": item["name"],
-            "friendly_name": item["name"],
-            "category": item["category"],
-            "last_completed": item["last_completed"],
-            "frequency": item["frequency"],
-        },
-    )
-
-
-async def remove_entity(hass: HomeAssistant, item):
-    entity_name = item["name"].lower().replace(" ", "_")
-    entity_category = item["category"].lower().replace(" ", "_")
-    entity_id = f"{DOMAIN}.{entity_category}_{entity_name}"
-    hass.states.async_remove(entity_id)
 
 
 async def async_setup_entry(
@@ -136,8 +101,41 @@ async def async_setup_entry(
     websocket_api.async_register_command(hass, websocket_handle_remove)
 
     # hass.helpers.discovery.load_platform("sensor", DOMAIN, {}, config_entry)
+    def test(self):
+        _LOGGER.error("triggered")
+
+    # async_track_time_interval(hass, test, timedelta(seconds=2))
 
     return True
+
+
+async def update_entities(hass: HomeAssistant, items):
+    for item in items:
+        await update_entity(hass, item)
+
+
+async def update_entity(hass: HomeAssistant, item):
+    entity_name = slugify(item["category"] + "_" + item["name"])
+    entity_id = f"{DOMAIN}.{entity_name}"
+    hass.states.async_set(
+        entity_id,
+        datetime.fromisoformat(item["last_completed"])
+        + timedelta(days=item["frequency"]),
+        {
+            "name": item["name"],
+            "friendly_name": item["name"],
+            "category": item["category"],
+            "last_completed": item["last_completed"],
+            "frequency": item["frequency"],
+        },
+    )
+
+
+async def remove_entity(hass: HomeAssistant, item):
+    entity_name = item["name"].lower().replace(" ", "_")
+    entity_category = item["category"].lower().replace(" ", "_")
+    entity_id = f"{DOMAIN}.{entity_category}_{entity_name}"
+    hass.states.async_remove(entity_id)
 
 
 class ActivityManager:
@@ -191,10 +189,6 @@ class ActivityManager:
         """Update a shopping list item."""
         item = next((itm for itm in self.items if itm["id"] == item_id), None)
 
-        # if item is None:
-        #     raise NoMatchingShoppingListItem
-
-        # info = ITEM_UPDATE_SCHEMA(info)
         item.update({"last_completed": datetime.now().isoformat()})
         await update_entity(self.hass, item)
         await self.hass.async_add_executor_job(self.save)

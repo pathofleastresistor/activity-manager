@@ -14,6 +14,7 @@ from homeassistant.util.json import JsonArrayType, load_json_array
 from homeassistant import config_entries
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import slugify
+from homeassistant.util import dt
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -97,10 +98,7 @@ async def async_setup_entry(
 
     @callback
     @websocket_api.websocket_command(
-        {
-            vol.Required("type"): "activity_manager/items",
-            vol.Optional("category"): str
-        }
+        {vol.Required("type"): "activity_manager/items", vol.Optional("category"): str}
     )
     def websocket_handle_items(
         hass: HomeAssistant,
@@ -213,7 +211,7 @@ class ActivityManager:
             "name": name,
             "category": category,
             "id": uuid.uuid4().hex,
-            "last_completed": datetime.now().isoformat(),
+            "last_completed": dt.now().isoformat(),
             "frequency": int(frequency),
         }
         self.items.append(item)
@@ -246,8 +244,8 @@ class ActivityManager:
 
     async def async_update_activity(self, item_id, context=None):
         item = next((itm for itm in self.items if itm["id"] == item_id), None)
+        item.update({"last_completed": dt.now().isoformat()})
 
-        item.update({"last_completed": datetime.now().isoformat()})
         await self.update_entity(item)
         await self.hass.async_add_executor_job(self.save)
 
@@ -265,9 +263,10 @@ class ActivityManager:
     async def update_entity(self, item):
         entity_name = slugify(item["category"] + "_" + item["name"])
         entity_id = f"{DOMAIN}.{entity_name}"
+
         self.hass.states.async_set(
             entity_id,
-            datetime.fromisoformat(item["last_completed"])
+            dt.as_local(dt.parse_datetime(item["last_completed"]))
             + timedelta(days=item["frequency"]),
             {
                 "name": item["name"],

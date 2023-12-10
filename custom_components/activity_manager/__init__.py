@@ -50,12 +50,30 @@ async def async_setup_entry(
     async def add_item_service(call: ServiceCall) -> None:
         """Add an item with `name`."""
         data = hass.data[DOMAIN]
+        _LOGGER.error("Data: %s", call.data)
+        
 
         name = call.data["name"]
         category = call.data["category"]
-        frequency = call.data["frequency"]
 
-        await data.async_add_activity(name, category, frequency)
+        if 'frequency_ms' in call.data.keys():
+            frequency_ms = (call.data["frequency_ms"]["hours"] * 60 * 60 * 1000) \
+                        + (call.data["frequency_ms"]["minutes"] * 60 * 1000) \
+                        + (call.data["frequency_ms"]["seconds"] * 1000)
+        else:
+            frequency_ms = 0
+
+        if 'icon' in call.data.keys():
+            icon = call.data["icon"]
+        else:
+            icon = None
+
+        if 'last_completed' in call.data.keys():
+            last_completed = dt.as_local(dt.parse_datetime(call.data["last_completed"])).isoformat()
+        else:
+            last_completed = None
+
+        await data.async_add_activity(name, category, frequency_ms, icon=icon, last_completed=last_completed)
 
     async def remove_item_service(call: ServiceCall) -> None:
         """Remove the first item with matching `name`."""
@@ -115,7 +133,9 @@ async def async_setup_entry(
             vol.Required("type"): "activity_manager/add",
             vol.Required("name"): str,
             vol.Required("category"): str,
-            vol.Required("frequency"): int,
+            vol.Required("frequency_ms"): int,
+            vol.Optional("last_completed"): int,
+            vol.Optional("icon"): str,
         }
     )
     @websocket_api.async_response
@@ -128,11 +148,11 @@ async def async_setup_entry(
         id = msg.pop("id")
         name = msg.pop("name")
         category = msg.pop("category")
-        frequency = msg.pop("frequency")
+        frequency_ms = msg.pop("frequency_ms")
         msg.pop("type")
 
         item = await hass.data[DOMAIN].async_add_activity(
-            name, category, frequency, connection.context(msg)
+            name, category, frequency_ms, context=connection.context(msg)
         )
         connection.send_message(websocket_api.result_message(id, item))
 
@@ -144,6 +164,7 @@ async def async_setup_entry(
             vol.Optional("name"): str,
             vol.Optional("category"): str,
             vol.Optional("frequency"): int,
+            vol.Optional("frequency_ms"): int,
         }
     )
     @websocket_api.async_response
@@ -206,13 +227,22 @@ class ActivityManager:
         self.hass = hass
         self.items: JsonArrayType = []
 
-    async def async_add_activity(self, name, category, frequency, context=None):
+    async def async_add_activity(self, name, category, frequency_ms, icon=None, last_completed=None, context=None):
+        if last_completed is None:
+            last_completed = dt.now().isoformat()
+
+        if icon is None:
+            icon = "mdi:checkbox-outline"
+
+        _LOGGER.debug(last_completed)
+
         item = {
             "name": name,
             "category": category,
             "id": uuid.uuid4().hex,
-            "last_completed": dt.now().isoformat(),
-            "frequency": int(frequency),
+            "last_completed": last_completed,
+            "frequency_ms" : frequency_ms,
+            "icon" : icon,
         }
         self.items.append(item)
         await self.update_entity(item)
@@ -242,9 +272,12 @@ class ActivityManager:
 
         return item
 
-    async def async_update_activity(self, item_id, context=None):
+    async def async_update_activity(self, item_id, last_completed=None, context=None):
+        if last_completed is None:
+                last_completed = dt.now().isoformat()
+
         item = next((itm for itm in self.items if itm["id"] == item_id), None)
-        item.update({"last_completed": dt.now().isoformat()})
+        item.update({"last_completed": last_completed})
 
         await self.update_entity(item)
         await self.hass.async_add_executor_job(self.save)
@@ -267,13 +300,13 @@ class ActivityManager:
         self.hass.states.async_set(
             entity_id,
             dt.as_local(dt.parse_datetime(item["last_completed"]))
-            + timedelta(days=item["frequency"]),
+            + timedelta(milliseconds=item["frequency_ms"]),
             {
                 "name": item["name"],
                 "friendly_name": item["name"],
                 "category": item["category"],
                 "last_completed": item["last_completed"],
-                "frequency": item["frequency"],
+                "frequency_ms": item["frequency_ms"],
             },
         )
 
@@ -287,7 +320,14 @@ class ActivityManager:
 
         def load() -> JsonArrayType:
             """Load the items synchronously."""
-            return load_json_array(self.hass.config.path(PERSISTENCE))
+
+            items = load_json_array(self.hass.config.path(PERSISTENCE))
+            for item in items:
+                if 'frequency_ms' not in item:
+                    item['frequency_ms'] = item['frequency'] * 24 * 60 * 60 * 1000
+                #_LOGGER.error("Item: %s", item)
+
+            return items
 
         self.items = await self.hass.async_add_executor_job(load)
 

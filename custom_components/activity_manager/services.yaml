@@ -16,15 +16,13 @@ add_activity:
       example: Workout
       selector:
         text:
-    frequency:
+    frequency_ms:
       name: Frequency
       description: The frequency of the activity
       required: true
-      example: 7
+      example: 7:0:0
       selector:
-        number:
-          min: 0
-          max: 5000
+        duration:
     last_completed:
       name: Last Completed
       description: Last time the activity was done

@@ -29,10 +29,15 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         return True
 
     hass.async_create_task(
+        discovery.async_load_platform(hass, "sensor", DOMAIN, None, hass_config=config)
+    )
+
+    hass.async_create_task(
         hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_IMPORT}
         )
     )
+
 
     return True
 
@@ -43,7 +48,7 @@ async def async_setup_entry(
 ) -> bool:
     """Set up Activity Manager from a config entry."""
 
-    data = hass.data[DOMAIN] = ActivityManager(hass)
+    data = hass.data[DOMAIN] = ActivityManager(hass, config_entry)
     await data.async_load_activities()
     await data.update_entities(data.items)
 
@@ -51,7 +56,7 @@ async def async_setup_entry(
     async def add_item_service(call: ServiceCall) -> None:
         """Add an item with `name`."""
         data = hass.data[DOMAIN]
-        _LOGGER.error("Data: %s", call.data)
+        _LOGGER.debug("Data: %s", call.data)
         
 
         name = call.data["name"]
@@ -208,6 +213,10 @@ async def async_setup_entry(
     # hass.helpers.discovery.load_platform("sensor", DOMAIN, {}, config_entry)
     # async_track_time_interval(hass, test, timedelta(seconds=2))
 
+    # Add sensor
+    hass.async_add_job(
+        hass.config_entries.async_forward_entry_setup(config_entry, "sensor")
+    )
     return True
 
 
@@ -218,11 +227,12 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 class ActivityManager:
     """Class to hold activity data."""
 
-    def __init__(self, hass: HomeAssistant) -> None:
+    def __init__(self, hass: HomeAssistant, entry) -> None:
         """Initialize the shopping list."""
 
         self.hass = hass
         self.items: JsonArrayType = []
+        self.entry = entry
 
     async def async_add_activity(self, name, category, frequency, icon=None, last_completed=None, context=None):
         if last_completed is None:
@@ -274,7 +284,7 @@ class ActivityManager:
                 last_completed = dt.now().isoformat()
 
         item = next((itm for itm in self.items if itm["id"] == item_id), None)
-        _LOGGER.error("last completed: %s", last_completed)
+        _LOGGER.debug("last completed: %s", last_completed)
         item["last_completed"] = dt.now().isoformat()
 
         await self.update_entity(item)
@@ -295,19 +305,22 @@ class ActivityManager:
         entity_name = slugify(item["category"] + "_" + item["name"])
         entity_id = f"{DOMAIN}.{entity_name}"
 
-        _LOGGER.error("Updating: %s", item)
-        self.hass.states.async_set(
-            entity_id,
-            dt.as_local(dt.parse_datetime(item["last_completed"]))
-            + timedelta(milliseconds=item["frequency_ms"]),
-            {
-                "name": item["name"],
-                "friendly_name": item["name"],
-                "category": item["category"],
-                "last_completed": item["last_completed"],
-                "frequency_ms": item["frequency_ms"],
-            },
-        )
+        _LOGGER.debug("Updating: %s", item)
+        await self.hass.config_entries.async_forward_entry_unload(self.entry, "sensor")
+        self.hass.async_add_job(self.hass.config_entries.async_forward_entry_setup(self.entry, "sensor"))
+
+        # self.hass.states.async_set(
+        #     entity_id,
+        #     dt.as_local(dt.parse_datetime(item["last_completed"]))
+        #     + timedelta(milliseconds=item["frequency_ms"]),
+        #     {
+        #         "name": item["name"],
+        #         "friendly_name": item["name"],
+        #         "category": item["category"],
+        #         "last_completed": item["last_completed"],
+        #         "frequency_ms": item["frequency_ms"],
+        #     },
+        # )
 
     async def remove_entity(self, item):
         entity_name = slugify(item["category"] + "_" + item["name"])
@@ -333,6 +346,10 @@ class ActivityManager:
 
                 # Set frequency_ms
                 item["frequency_ms"] = self._duration_to_ms(item["frequency"])
+
+                if "icon" not in item:
+                    item["icon"] = "mdi:checkbox-outline"
+                    
             return items
 
         self.items = await self.hass.async_add_executor_job(load)

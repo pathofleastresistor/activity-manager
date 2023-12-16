@@ -3,6 +3,9 @@ import voluptuous as vol
 from homeassistant import config_entries
 
 from .const import DOMAIN  # import the domain from const.py
+import logging
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class ActivityManagerFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
@@ -16,16 +19,6 @@ class ActivityManagerFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         await self.async_set_unique_id(DOMAIN)
         self._abort_if_unique_id_configured()
 
-        if user_input is None:
-            return self.async_show_form(
-                step_id="user",
-                data_schema=vol.Schema(
-                    {
-                        vol.Required("name"): str,
-                    }
-                ),
-            )
-
-        return self.async_create_entry(title=user_input["name"], data=user_input)
+        return self.async_create_entry(title='Activity Manager', data={'name': 'Activity Manager'})
 
     async_step_import = async_step_user

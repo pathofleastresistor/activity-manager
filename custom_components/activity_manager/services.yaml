@@ -23,6 +23,7 @@ add_activity:
       example: 7:0:0
       selector:
         duration:
+          enable_day: true
     last_completed:
       name: Last Completed
       description: Last time the activity was done

@@ -50,7 +50,7 @@ async def async_setup_entry(
 
     data = hass.data[DOMAIN] = ActivityManager(hass, config_entry)
     await data.async_load_activities()
-    await data.update_entities(data.items)
+    data.update_entities()
 
 
     async def add_item_service(call: ServiceCall) -> None:
@@ -250,10 +250,11 @@ class ActivityManager:
             "frequency_ms" : self._duration_to_ms(frequency),
             "icon" : icon,
         }
-        _LOGGER.debug("Item: %s", item)
+        
         self.items.append(item)
-        await self.hass.async_add_executor_job(self.save)
-        await self.update_entity(item)
+        await self.update_entities()
+        
+        _LOGGER.debug("Added activity: %s", item)
         self.hass.bus.async_fire(
             "activity_manager_updated",
             {"action": "add", "item": item},
@@ -265,12 +266,10 @@ class ActivityManager:
     async def async_remove_activity(self, item_id, context=None):
         item = next((itm for itm in self.items if itm["id"] == item_id), None)
 
-        # if item is None:
-        #     raise NoMatchingShoppingListItem
-
         self.items.remove(item)
-        await self.remove_entity(item)
-        await self.hass.async_add_executor_job(self.save)
+        await self.update_entities()
+
+        _LOGGER.debug("Removed activity: %s", item)
         self.hass.bus.async_fire(
             "activity_manager_updated",
             {"action": "remove", "item": item},
@@ -284,48 +283,25 @@ class ActivityManager:
                 last_completed = dt.now().isoformat()
 
         item = next((itm for itm in self.items if itm["id"] == item_id), None)
-        _LOGGER.debug("last completed: %s", last_completed)
+        
         item["last_completed"] = dt.now().isoformat()
 
-        await self.update_entity(item)
-        await self.hass.async_add_executor_job(self.save)
+        await self.update_entities()
 
+        _LOGGER.debug("Updated activity: %s", item)
         self.hass.bus.async_fire(
             "activity_manager_updated",
             {"action": "updated", "item": item},
             context=context,
         )
+
         return item
 
-    async def update_entities(self, items):
-        for item in items:
-            await self.update_entity(item)
+    async def update_entities(self):
 
-    async def update_entity(self, item):
-        entity_name = slugify(item["category"] + "_" + item["name"])
-        entity_id = f"{DOMAIN}.{entity_name}"
-
-        _LOGGER.debug("Updating: %s", item)
         await self.hass.config_entries.async_forward_entry_unload(self.entry, "sensor")
         self.hass.async_add_job(self.hass.config_entries.async_forward_entry_setup(self.entry, "sensor"))
-
-        # self.hass.states.async_set(
-        #     entity_id,
-        #     dt.as_local(dt.parse_datetime(item["last_completed"]))
-        #     + timedelta(milliseconds=item["frequency_ms"]),
-        #     {
-        #         "name": item["name"],
-        #         "friendly_name": item["name"],
-        #         "category": item["category"],
-        #         "last_completed": item["last_completed"],
-        #         "frequency_ms": item["frequency_ms"],
-        #     },
-        # )
-
-    async def remove_entity(self, item):
-        entity_name = slugify(item["category"] + "_" + item["name"])
-        entity_id = f"{DOMAIN}.{entity_name}"
-        self.hass.states.async_remove(entity_id)
+        await self.hass.async_add_executor_job(self.save)
 
     async def async_load_activities(self) -> None:
         """Load items."""
@@ -357,10 +333,6 @@ class ActivityManager:
     def save(self) -> None:
         """Save the items."""
         items = self.items
-
-        # for item in items:
-        #     if 'frequency_ms' in item:
-        #         del item['frequency_ms']
 
         save_json(self.hass.config.path(PERSISTENCE), items)
 

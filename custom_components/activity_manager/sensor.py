@@ -65,6 +65,7 @@ class ActivityEntity(SensorEntity):
             "last_completed": self._activity["last_completed"],
             "frequency_ms": self._activity["frequency_ms"],
             "friendly_name": self._activity["name"],
+            "integration": DOMAIN,
         }
 
     @property

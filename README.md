@@ -66,6 +66,52 @@ data:
     notification_icon: "mdi:dumbbell"
 ```
 
+Another example on automation for a daily mail report on overdue tasks (copy&paste into automations.yaml)
+```
+- id: '1688160592613'
+  alias: 'activity-manager: daily email reminder on overdue tasks'
+  description: email notification on overdue tasks within activity-manager
+  trigger:
+  - platform: sun
+    event: sunrise
+    offset: 0
+  condition:
+  - condition: template
+    value_template: '{{ states.sensor | selectattr(''attributes.integration'', ''eq'',
+      ''activity_manager'') | map(attribute=''state'') | map(''as_datetime'') | reject(">",
+      now()) | list | count > 0 }}'
+  action:
+  - service: notify.notify_email
+    data:
+      target:
+      - example@domain.com
+      title: '#### {{ states.sensor | selectattr(''attributes.integration'', ''eq'',
+        ''activity_manager'') | map(attribute=''state'') |  map(''as_datetime'') |
+        reject(">", now()) | list | count }}  overdue tasks ####'
+      message: '
+
+        currently {{ states.sensor | selectattr(''attributes.integration'', ''eq'',
+        ''activity_manager'') | map(attribute=''state'') | map(''as_datetime'') |
+        reject(">", now())  | list | count }} tasks are overdue: {{"\n"}}  {%- for
+        activity in states.sensor | selectattr(''attributes.integration'', ''eq'',
+        ''activity_manager'') -%} {%- if  activity.state|as_datetime < now() -%} {{"\n"}}
+        {{ activity.name }} seit {{ (now() - activity.state|as_datetime).days }} {{"Tagen
+        ("}}{{ as_timestamp(activity.state|as_datetime) | timestamp_custom(''%d.%m.%Y'')
+        }}{{")"}} {%- endif -%} {%- endfor %} {{"\n"}}      {{"\n"}}      {{"\n"}}
+
+        overview of all {{ states.sensor | selectattr(''attributes.integration'',
+        ''eq'', ''activity_manager'') | map(attribute=''state'') | map(''as_datetime'')
+        | list | count }} Aufgaben: {{"\n"}}         {%- for activity in states.sensor
+        | selectattr(''attributes.integration'', ''eq'', ''activity_manager'') -%}     {{"\n"}}{{  activity.name
+        }} last {{ as_timestamp(activity.attributes.last_completed|as_datetime)
+        | timestamp_custom(''%d.%m.%Y'') }}, in {{ (activity.state|as_datetime - now()).days
+        }}/{{ int(activity.attributes.frequency_ms /86400000) }} days      {%- endfor
+        %}
+
+        {{"\n"}}{{"\n"}} This Mail was automatically sent via homeAssistant/automation'
+  mode: single
+```
+
 ### More information
 
 -   Activities are stored in .activities_list.json in your `<config>` folder

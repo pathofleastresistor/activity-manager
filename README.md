@@ -18,7 +18,7 @@ The core idea is that an activity happens on a recurring basis, which is stored 
 
 ### Manually
 
-Clone or download this repository and copy the "nfl" directory to your "custom_components" directory in your config directory
+Clone or download this repository and copy the "activity_manager" directory to your "custom_components" directory in your config directory
 
 `<config directory>/custom_components/activity-manager/...`
 

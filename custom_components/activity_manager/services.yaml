@@ -16,7 +16,7 @@ add_activity:
       example: Workout
       selector:
         text:
-    frequency_ms:
+    frequency:
       name: Frequency
       description: The frequency of the activity
       required: true
@@ -40,42 +40,58 @@ remove_activity:
   name: Remove Activity
   description: Remove the first item with matching name from the list.
   fields:
-    name:
-      name: Name
-      description: The name of the item to remove.
-      required: true
-      example: Running
-      selector:
-        text:
-    category:
-      name: Category
-      description: The name of the item to add.
+    entity_id:
+      name: Entity ID
+      description: The id of the entity to update
       required: true
       example: Workout
       selector:
-        text:
+        entity:
+          filter:
+            - integration: "activity_manager"
 
 update_activity:
   name: Update Activity
-  description: Update the first item with matching name from the list.
+  description: Update the activity
   fields:
-    name:
-      name: Name
-      description: The name of the item to remove.
-      required: true
-      example: Running
-      selector:
-        text:
-    category:
-      name: Category
-      description: The name of the item to add.
+    entity_id:
+      name: Entity ID
+      description: The id of the entity to update
       required: true
       example: Workout
       selector:
-        text:
+        entity:
+          filter:
+            - integration: "activity_manager"
+    now:
+      name: Now
+      description: Preferred over last completed
+      required: false
+      selector:
+        boolean:
     last_completed:
       name: Last Completed
       description: Last time the activity was done
       required: false
       selector:
         datetime:
+    category:
+      name: Category
+      description: The category
+      required: false
+      example: Workout
+      selector:
+        text:
+    frequency:
+      name: Frequency
+      description: The frequency of the activity
+      required: false
+      example: 07:00:00
+      selector:
+        duration:
+          enable_day: true
+    icon:
+      name: Icon
+      required: false
+      selector:
+        icon:

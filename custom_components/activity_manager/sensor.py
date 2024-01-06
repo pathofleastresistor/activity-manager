@@ -282,4 +282,3 @@ class ActivityEntity(SensorEntity):
                 self._attributes["category"] = item["category"]
                 self._attributes["frequency_ms"] = item["frequency_ms"]
                 self._attributes["icon"] = item["icon"]
-                self.async_write_ha_state()

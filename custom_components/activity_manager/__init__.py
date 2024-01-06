@@ -4,8 +4,10 @@ from datetime import datetime, timedelta
 import logging
 import voluptuous as vol
 import uuid
+import json
 from homeassistant.helpers.json import save_json
 from homeassistant.components import websocket_api
+from homeassistant.helpers.entity_registry import async_get
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, callback
@@ -38,7 +40,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         )
     )
 
-
     return True
 
 
@@ -47,68 +48,67 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
 ) -> bool:
     """Set up Activity Manager from a config entry."""
-
-    data = hass.data[DOMAIN] = ActivityManager(hass, config_entry)
-    await data.async_load_activities()
-    data.update_entities()
-
+    # Add sensor
+    hass.async_add_job(
+        hass.config_entries.async_forward_entry_setup(config_entry, "sensor")
+    )
 
     async def add_item_service(call: ServiceCall) -> None:
         """Add an item with `name`."""
         data = hass.data[DOMAIN]
-        _LOGGER.debug("Data: %s", call.data)
-        
 
-        name = call.data["name"]
-        category = call.data["category"]
-        frequency_str = call.data["frequency"]
+        name = call.data.get("name")
+        category = call.data.get("category")
+        frequency_str = call.data.get("frequency")
+        last_completed = call.data.get("last_completed")
+        icon = call.data.get("icon")
 
-        if 'icon' in call.data.keys():
-            icon = call.data["icon"]
+        if last_completed:
+            last_completed = dt.parse_datetime(last_completed).isoformat()
         else:
-            icon = None
+            last_completed = dt.now().isoformat()
 
-        if 'last_completed' in call.data.keys():
-            last_completed = dt.as_local(dt.parse_datetime(call.data["last_completed"])).isoformat()
-        else:
-            last_completed = None
-
-        await data.async_add_activity(name, category, frequency_str, icon=icon, last_completed=last_completed)
+        await data.async_add_activity(
+            name, category, frequency_str, icon=icon, last_completed=last_completed
+        )
 
     async def remove_item_service(call: ServiceCall) -> None:
-        """Remove the first item with matching `name`."""
         data = hass.data[DOMAIN]
 
-        name = call.data["name"]
-        category = call.data["category"]
+        entity_id = call.data.get("entity_id")
 
-        try:
-            item = [
-                item
-                for item in data.items
-                if (item["name"] == name and item["category"] == category)
-            ][0]
-        except IndexError:
-            _LOGGER.error("Removing of item failed: %s cannot be found", name)
-        else:
-            await data.async_remove_activity(item["id"])
+        if entity_id:
+            entity_registry = async_get(hass)
+            entity = entity_registry.entities.get(entity_id)
+            if entity:
+                await data.async_remove_activity(entity.unique_id)
 
     async def update_item_service(call: ServiceCall) -> None:
-        """Remove the first item with matching `name`."""
         data = hass.data[DOMAIN]
-        name = call.data["name"]
-        category = call.data["category"]
+        entity_id = call.data.get("entity_id")
+        last_completed = call.data.get("last_completed")
+        category = call.data.get("category")
+        now = call.data.get("now")
+        frequency = call.data.get("frequency")
+        icon = call.data.get("icon")
 
-        try:
-            item = [
-                item
-                for item in data.items
-                if (item["name"] == name and item["category"] == category)
-            ][0]
-        except IndexError:
-            _LOGGER.error("Update of item failed: %s cannot be found", name)
-        else:
-            await data.async_update_activity(item["id"])
+        if last_completed:
+            last_completed = dt.parse_datetime(last_completed).isoformat()
+
+        if now:
+            last_completed = dt.now().isoformat()
+
+        if entity_id:
+            entity_registry = async_get(hass)
+            entity = entity_registry.entities.get(entity_id)
+            if entity:
+                await data.async_update_activity(
+                    entity.unique_id,
+                    last_completed=last_completed,
+                    category=category,
+                    frequency=frequency,
+                    icon=icon,
+                )
 
     hass.services.async_register(DOMAIN, "add_activity", add_item_service)
     hass.services.async_register(DOMAIN, "remove_activity", remove_item_service)
@@ -162,7 +162,7 @@ async def async_setup_entry(
             vol.Required("item_id"): str,
             vol.Optional("last_completed"): str,
             vol.Optional("name"): str,
-            vol.Optional("category"): str
+            vol.Optional("category"): str,
         }
     )
     @websocket_api.async_response
@@ -177,8 +177,11 @@ async def async_setup_entry(
         msg.pop("type")
         data = msg
 
+        # TODO: Support custom last_completed from UI
+        last_completed = dt.now().isoformat()
+
         item = await hass.data[DOMAIN].async_update_activity(
-            item_id, connection.context(msg)
+            item_id, last_completed=last_completed, context=connection.context(msg)
         )
         connection.send_message(websocket_api.result_message(msg_id, item))
 
@@ -210,145 +213,9 @@ async def async_setup_entry(
     websocket_api.async_register_command(hass, websocket_handle_update)
     websocket_api.async_register_command(hass, websocket_handle_remove)
 
-    # hass.helpers.discovery.load_platform("sensor", DOMAIN, {}, config_entry)
-    # async_track_time_interval(hass, test, timedelta(seconds=2))
-
-    # Add sensor
-    hass.async_add_job(
-        hass.config_entries.async_forward_entry_setup(config_entry, "sensor")
-    )
     return True
 
 
 async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload the config entry when it changed."""
     await hass.config_entries.async_reload(entry.entry_id)
-
-class ActivityManager:
-    """Class to hold activity data."""
-
-    def __init__(self, hass: HomeAssistant, entry) -> None:
-        """Initialize the shopping list."""
-
-        self.hass = hass
-        self.items: JsonArrayType = []
-        self.entry = entry
-
-    async def async_add_activity(self, name, category, frequency, icon=None, last_completed=None, context=None):
-        if last_completed is None:
-            last_completed = dt.now().isoformat()
-
-        if icon is None:
-            icon = "mdi:checkbox-outline"
-
-        item = {
-            "name": name,
-            "category": category,
-            "id": uuid.uuid4().hex,
-            "last_completed": last_completed,
-            "frequency" : frequency,
-            "frequency_ms" : self._duration_to_ms(frequency),
-            "icon" : icon,
-        }
-        
-        self.items.append(item)
-        await self.update_entities()
-        
-        _LOGGER.debug("Added activity: %s", item)
-        self.hass.bus.async_fire(
-            "activity_manager_updated",
-            {"action": "add", "item": item},
-            context=context,
-        )
-
-        return item
-
-    async def async_remove_activity(self, item_id, context=None):
-        item = next((itm for itm in self.items if itm["id"] == item_id), None)
-
-        self.items.remove(item)
-        await self.update_entities()
-
-        _LOGGER.debug("Removed activity: %s", item)
-        self.hass.bus.async_fire(
-            "activity_manager_updated",
-            {"action": "remove", "item": item},
-            context=context,
-        )
-
-        return item
-
-    async def async_update_activity(self, item_id, last_completed=None, context=None):
-        if last_completed is None:
-                last_completed = dt.now().isoformat()
-
-        item = next((itm for itm in self.items if itm["id"] == item_id), None)
-        
-        item["last_completed"] = dt.now().isoformat()
-
-        await self.update_entities()
-
-        _LOGGER.debug("Updated activity: %s", item)
-        self.hass.bus.async_fire(
-            "activity_manager_updated",
-            {"action": "updated", "item": item},
-            context=context,
-        )
-
-        return item
-
-    async def update_entities(self):
-
-        await self.hass.config_entries.async_forward_entry_unload(self.entry, "sensor")
-        self.hass.async_add_job(self.hass.config_entries.async_forward_entry_setup(self.entry, "sensor"))
-        await self.hass.async_add_executor_job(self.save)
-
-    async def async_load_activities(self) -> None:
-        """Load items."""
-
-        def load() -> JsonArrayType:
-            """Load the items synchronously."""
-
-            items = load_json_array(self.hass.config.path(PERSISTENCE))
-            for item in items:
-                if "frequency" not in item:
-                    if "frequency_ms" in item:
-                        _LOGGER.error("No frequency, using frequency_ms: %s", item)
-                        continue
-                    else:
-                        item["frequency_ms"] = self._duration_to_ms(7)
-                        _LOGGER.error("Added missing frequency: %s", item)
-                        continue
-
-                # Set frequency_ms
-                item["frequency_ms"] = self._duration_to_ms(item["frequency"])
-
-                if "icon" not in item:
-                    item["icon"] = "mdi:checkbox-outline"
-                    
-            return items
-
-        self.items = await self.hass.async_add_executor_job(load)
-
-    def save(self) -> None:
-        """Save the items."""
-        items = self.items
-
-        save_json(self.hass.config.path(PERSISTENCE), items)
-
-    def _duration_to_ms(self, frequency) -> int:
-        # prior versions stored a single int for number of days
-        try:
-            return int(frequency) * 24 * 60 * 60 * 1000
-        except:
-            frequency_ms = 0
-            if("days" in frequency):
-                frequency_ms += frequency["days"] * 24 * 60 * 60 * 1000
-            if("hours" in frequency):
-                frequency_ms += frequency["hours"] * 60 * 60 * 1000
-            if("minutes" in frequency):
-                frequency_ms += frequency["minutes"] * 60 * 1000
-            if("seconds" in frequency):
-                frequency_ms += frequency["seconds"] * 1000
-            
-            return frequency_ms

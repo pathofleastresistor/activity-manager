@@ -26,7 +26,6 @@ from homeassistant.util.json import JsonArrayType, load_json_array
 from datetime import datetime, timedelta
 
 from .const import DOMAIN
-from .utils import duration_to_ms
 
 _LOGGER = logging.getLogger(__name__)
 PERSISTENCE = ".activities_list.json"
@@ -35,8 +34,17 @@ PERSISTENCE = ".activities_list.json"
 async def async_setup_entry(hass, config_entry, async_add_devices):
     data = hass.data[DOMAIN] = ActivityManager(hass, config_entry, async_add_devices)
     await data.async_load_activities()
+    activities = []
+
     for item in data.items:
-        async_add_devices([ActivityEntity(hass, config_entry, item)], True)
+        activities.append(ActivityEntity(hass, config_entry, item))
+
+    async_add_devices(activities, True)
+
+    entity_registry = async_get(hass)
+    for entity_id, entity_entry in entity_registry.entities.items():
+        if entity_id.startswith("sensor.workout"):
+            _LOGGER.debug(entity_entry)
 
 
 class ActivityManager:

@@ -30,9 +30,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     if DOMAIN not in config:
         return True
 
-    hass.async_create_task(
-        discovery.async_load_platform(hass, "sensor", DOMAIN, None, hass_config=config)
-    )
+    # hass.async_create_task(
+    #     discovery.async_load_platform(hass, "sensor", DOMAIN, None, hass_config=config)
+    # )
 
     hass.async_create_task(
         hass.config_entries.flow.async_init(

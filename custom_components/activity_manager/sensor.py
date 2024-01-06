@@ -41,11 +41,6 @@ async def async_setup_entry(hass, config_entry, async_add_devices):
 
     async_add_devices(activities, True)
 
-    entity_registry = async_get(hass)
-    for entity_id, entity_entry in entity_registry.entities.items():
-        if entity_id.startswith("sensor.workout"):
-            _LOGGER.debug(entity_entry)
-
 
 class ActivityManager:
     """Class to hold activity data."""

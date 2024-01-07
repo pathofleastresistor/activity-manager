@@ -18,6 +18,7 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import slugify
 from homeassistant.util import dt
 from .const import DOMAIN
+from .utils import dt_as_local
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ async def async_setup_entry(
         icon = call.data.get("icon")
 
         if last_completed:
-            last_completed = dt.parse_datetime(last_completed).isoformat()
+            last_completed = dt_as_local(last_completed)
         else:
             last_completed = dt.now().isoformat()
 
@@ -93,7 +94,7 @@ async def async_setup_entry(
         icon = call.data.get("icon")
 
         if last_completed:
-            last_completed = dt.parse_datetime(last_completed).isoformat()
+            last_completed = dt_as_local(last_completed)
 
         if now:
             last_completed = dt.now().isoformat()
@@ -149,10 +150,21 @@ async def async_setup_entry(
         name = msg.pop("name")
         category = msg.pop("category")
         frequency = msg.pop("frequency")
+        icon = msg.get("icon")
+        last_completed = msg.get("last_completed")
         msg.pop("type")
 
+        if last_completed:
+            last_completed = dt_as_local(last_completed)
+        else:
+            last_completed = dt.now().isoformat()
+
         item = await hass.data[DOMAIN].async_add_activity(
-            name, category, frequency, context=connection.context(msg)
+            name,
+            category,
+            frequency,
+            last_completed=last_completed,
+            context=connection.context(msg),
         )
         connection.send_message(websocket_api.result_message(id, item))
 
@@ -175,10 +187,13 @@ async def async_setup_entry(
         msg_id = msg.pop("id")
         item_id = msg.pop("item_id")
         msg.pop("type")
+        last_completed = msg.get("last_completed")
         data = msg
 
-        # TODO: Support custom last_completed from UI
-        last_completed = dt.now().isoformat()
+        if last_completed:
+            last_completed = dt.as_local(dt.parse_datetime(last_completed)).isoformat()
+        else:
+            last_completed = dt.now().isoformat()
 
         item = await hass.data[DOMAIN].async_update_activity(
             item_id, last_completed=last_completed, context=connection.context(msg)

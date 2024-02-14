@@ -1,12 +1,12 @@
 {
     "domain": "activity_manager",
     "name": "Activity Manager",
-    "documentation": "https://example.com",
+    "documentation": "https://github.com/pathofleastresistor/activity-manager/",
     "config_flow": true,
     "dependencies": [],
     "codeowners": [],
-    "version": "1.0",
-    "description": "A simple custom component that prints a message to the console.",
+    "version": "0.0.6",
+    "description": "Manage recurring tasks from within Home Assistant",
     "requirements": [],
     "iot_class": "assumed_state"
   }

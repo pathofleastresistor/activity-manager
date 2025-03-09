@@ -50,9 +50,7 @@ async def async_setup_entry(
 ) -> bool:
     """Set up Activity Manager from a config entry."""
     # Add sensor
-    hass.async_add_job(
-        hass.config_entries.async_forward_entry_setup(config_entry, "sensor")
-    )
+    await hass.config_entries.async_forward_entry_setups(config_entry, ["sensor"])
 
     async def add_item_service(call: ServiceCall) -> None:
         """Add an item with `name`."""

@@ -1,7 +1,3 @@
-# EARLY RELEASE
-
-This was designed to solve a personal need and I'm now trying to prepare it for others to use. That means several things can break between releases.
-
 # activity-manager
 
 Manager recurring tasks from within Home Assistant

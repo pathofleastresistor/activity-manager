@@ -197,6 +197,7 @@ class ActivityManagerCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
         self,
         item_id: str,
         last_completed: str | None = None,
+        name: str | None = None,
         category: str | None = None,
         frequency: dict[str, int] | None = None,
         icon: str | None = None,
@@ -214,6 +215,8 @@ class ActivityManagerCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
 
         if last_completed is not None:
             item[ATTR_LAST_COMPLETED] = last_completed
+        if name is not None:
+            item[ATTR_NAME] = name
         if category is not None:
             item[ATTR_CATEGORY] = category
         if frequency is not None:

@@ -328,6 +328,7 @@ def _register_websocket_handlers(hass: HomeAssistant) -> None:
             item = await coordinator.async_update_activity(
                 item_id=msg["item_id"],
                 last_completed=last_completed,
+                name=msg.get("name"),
                 category=msg.get("category"),
                 frequency=msg.get("frequency"),
                 icon=msg.get("icon"),

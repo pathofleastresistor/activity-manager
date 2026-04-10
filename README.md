@@ -32,7 +32,9 @@ Once installed, you can use the link below to add the integration from the UI.
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=activity_manager)
 
-If you're using the [Activity Manager Card](https://github.com/pathofleastresistor/activity-manager-card), then you all you need to do is add the Activity Manager Card to your dashboard. When you're creating the card, you'll have to supply a `category` attribute to the card.
+You can add multiple activity lists by adding the integration more than once — each instance is independent with its own set of activities.
+
+If you're using the [Activity Manager Card](https://github.com/pathofleastresistor/activity-manager-card), add the card to your dashboard and use the built-in editor to select which activity list to display. You can optionally filter by category.
 
 ### Notifications
 
@@ -64,6 +66,6 @@ data:
 
 ### More information
 
--   Activities are stored in .activities_list.json in your `<config>` folder
--   An entity is created for each activity (e.g. `sensor.<category>_<activity>`). The state of the activity is the datetime of when the activity is due. You can use this entity to build notifications or your own custom cards.
--   Three services are exposed: `activity_manager.add_activity`, `activity_manager.update_activity`, `activity_manager.remove_activity`. The update activity can be used to reset the timer.
+-   Activities are stored in `.activities_list_<entry_id>.json` in your `<config>` folder, one file per list. If you're upgrading from an older version, the legacy `.activities_list.json` is automatically migrated and a `.activities_list.json.bak` backup is created.
+-   An entity is created for each activity. The state of the entity is the datetime of when the activity is next due. You can use this entity to build notifications or your own custom cards.
+-   Three services are exposed: `activity_manager.add_activity`, `activity_manager.update_activity`, `activity_manager.remove_activity`. When multiple lists are configured, pass `entry_id` to target the correct list. The update service can be used to reset the timer.

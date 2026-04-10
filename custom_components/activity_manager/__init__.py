@@ -48,7 +48,7 @@ _FREQUENCY_SCHEMA = vol.Any(
 
 ADD_ACTIVITY_SCHEMA = vol.Schema(
     {
-        vol.Required("entry_id"): cv.string,
+        vol.Required("list"): cv.string,
         vol.Required("name"): cv.string,
         vol.Required("category"): cv.string,
         vol.Required("frequency"): _FREQUENCY_SCHEMA,
@@ -78,6 +78,14 @@ UPDATE_ACTIVITY_SCHEMA = vol.Schema(
 def _get_coordinator(hass: HomeAssistant, entry_id: str) -> ActivityManagerCoordinator | None:
     """Look up a coordinator by entry_id."""
     return hass.data.get(DOMAIN, {}).get(entry_id)
+
+
+def _get_coordinator_by_title(hass: HomeAssistant, title: str) -> ActivityManagerCoordinator | None:
+    """Look up a coordinator by list title (case-insensitive)."""
+    for coord in hass.data.get(DOMAIN, {}).values():
+        if coord.title.lower() == title.lower():
+            return coord
+    return None
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -132,9 +140,9 @@ def _register_services(hass: HomeAssistant) -> None:
     """Register domain services (called once on first entry setup)."""
 
     async def add_activity_service(call: ServiceCall) -> None:
-        coordinator = _get_coordinator(hass, call.data["entry_id"])
+        coordinator = _get_coordinator_by_title(hass, call.data["list"])
         if not coordinator:
-            _LOGGER.error("add_activity: unknown entry_id %s", call.data["entry_id"])
+            _LOGGER.error("add_activity: no list named %r", call.data["list"])
             return
 
         last_completed = call.data.get("last_completed")

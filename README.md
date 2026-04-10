@@ -69,6 +69,6 @@ data:
 -   Activities are stored in `.activities_list_<entry_id>.json` in your `<config>` folder, one file per list. If you're upgrading from an older version, the legacy `.activities_list.json` is automatically migrated and a `.activities_list.json.bak` backup is created.
 -   An entity is created for each activity. The state of the entity is the datetime of when the activity is next due. You can use this entity to build notifications or your own custom cards.
 -   Three services are exposed:
-    -   `activity_manager.add_activity` — add a new activity; requires `list` (the name of the activity list, e.g. `"Home"`), `name`, `category`, `frequency`; optional `last_completed` and `icon`
+    -   `activity_manager.add_activity` — add a new activity; requires `list` (the name of the activity list as configured, e.g. `"Home"`; if you migrated from a legacy installation this will be `"Activity Manager"`), `name`, `category`, `frequency`; optional `last_completed` and `icon`
     -   `activity_manager.update_activity` — update an existing activity by `entity_id`; pass `now: true` to reset the timer to now, or `last_completed` to set a specific datetime
     -   `activity_manager.remove_activity` — remove an activity by `entity_id`

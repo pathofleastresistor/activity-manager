@@ -1,0 +1,27 @@
+{
+  "title": "Activity Manager",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Create Activity List",
+        "description": "Enter a name for this activity list (e.g. Home, Social).",
+        "data": {
+          "name": "List name"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "A list with this name already exists."
+    },
+    "error": {
+      "name_required": "List name cannot be empty."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Activity Manager Options"
+      }
+    }
+  }
+}

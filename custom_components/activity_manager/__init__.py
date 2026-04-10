@@ -59,14 +59,12 @@ ADD_ACTIVITY_SCHEMA = vol.Schema(
 
 REMOVE_ACTIVITY_SCHEMA = vol.Schema(
     {
-        vol.Required("entry_id"): cv.string,
         vol.Required("entity_id"): cv.entity_id,
     }
 )
 
 UPDATE_ACTIVITY_SCHEMA = vol.Schema(
     {
-        vol.Required("entry_id"): cv.string,
         vol.Required("entity_id"): cv.entity_id,
         vol.Optional("last_completed"): cv.string,
         vol.Optional("now"): cv.boolean,
@@ -152,30 +150,33 @@ def _register_services(hass: HomeAssistant) -> None:
         )
 
     async def remove_activity_service(call: ServiceCall) -> None:
-        coordinator = _get_coordinator(hass, call.data["entry_id"])
-        if not coordinator:
-            _LOGGER.error("remove_activity: unknown entry_id %s", call.data["entry_id"])
-            return
-
         entity_registry = er_async_get(hass)
         entity = entity_registry.entities.get(call.data["entity_id"])
-        if entity:
-            # Strip the entry_id prefix to get the raw activity id.
-            activity_id = entity.unique_id.removeprefix(f"{coordinator.entry_id}_")
-            await coordinator.async_remove_activity(activity_id)
-        else:
+        if not entity:
             _LOGGER.warning("remove_activity: entity not found: %s", call.data["entity_id"])
-
-    async def update_activity_service(call: ServiceCall) -> None:
-        coordinator = _get_coordinator(hass, call.data["entry_id"])
-        if not coordinator:
-            _LOGGER.error("update_activity: unknown entry_id %s", call.data["entry_id"])
             return
 
+        # Derive entry_id from the entity's unique_id prefix (<entry_id>_<activity_id>).
+        entry_id, _, activity_id = entity.unique_id.partition("_")
+        coordinator = _get_coordinator(hass, entry_id)
+        if not coordinator:
+            _LOGGER.error("remove_activity: no coordinator for entry_id %s", entry_id)
+            return
+
+        await coordinator.async_remove_activity(activity_id)
+
+    async def update_activity_service(call: ServiceCall) -> None:
         entity_registry = er_async_get(hass)
         entity = entity_registry.entities.get(call.data["entity_id"])
         if not entity:
             _LOGGER.warning("update_activity: entity not found: %s", call.data["entity_id"])
+            return
+
+        # Derive entry_id from the entity's unique_id prefix (<entry_id>_<activity_id>).
+        entry_id, _, activity_id = entity.unique_id.partition("_")
+        coordinator = _get_coordinator(hass, entry_id)
+        if not coordinator:
+            _LOGGER.error("update_activity: no coordinator for entry_id %s", entry_id)
             return
 
         last_completed = call.data.get("last_completed")
@@ -184,7 +185,6 @@ def _register_services(hass: HomeAssistant) -> None:
         elif last_completed:
             last_completed = dt_as_local(last_completed)
 
-        activity_id = entity.unique_id.removeprefix(f"{coordinator.entry_id}_")
         await coordinator.async_update_activity(
             activity_id,
             last_completed=last_completed,

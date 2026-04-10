@@ -70,8 +70,18 @@ class ActivityManagerOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options for Activity Manager."""
 
     async def async_step_init(self, user_input=None):
-        """Show an empty options form (no configurable options yet)."""
+        """Allow renaming the activity list."""
         if user_input is not None:
+            name = user_input["name"].strip()
+            if name and name != self.config_entry.title:
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry, title=name
+                )
             return self.async_create_entry(data={})
 
-        return self.async_show_form(step_id="init", data_schema=None)
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {vol.Required("name", default=self.config_entry.title): str}
+            ),
+        )

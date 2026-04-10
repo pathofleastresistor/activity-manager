@@ -20,7 +20,10 @@
   "options": {
     "step": {
       "init": {
-        "title": "Activity Manager Options"
+        "title": "Rename Activity List",
+        "data": {
+          "name": "List name"
+        }
       }
     }
   }

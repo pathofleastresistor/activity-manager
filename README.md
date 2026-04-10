@@ -105,7 +105,21 @@ Remove an activity permanently.
 
 ## Notifications
 
-Because each activity is a sensor entity, you can build automations around them. The example below sends a mobile notification at sunrise listing all overdue workout activities:
+### Blueprint
+
+A ready-made automation blueprint is included. Import it with one click:
+
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fpathofleastresistor%2Factivity-manager%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Factivity_manager_notify.yaml)
+
+Configure:
+- **Notification service** — e.g. `notify.mobile_app_your_phone`
+- **Category filter** — leave blank to notify for all categories
+- **Time** — when to check each day
+- **Title** — notification title
+
+### Custom automations
+
+Because each activity is a sensor entity, you can build your own automations. The example below sends a mobile notification at sunrise listing all overdue workout activities:
 
 ```yaml
 service: notify.mobile_android_phone

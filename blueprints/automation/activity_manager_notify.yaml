@@ -1,0 +1,68 @@
+blueprint:
+  name: Activity Manager — Overdue Notification
+  description: >
+    Send a notification when one or more activities are overdue.
+    Optionally filter by category and customize the notification target and schedule.
+  domain: automation
+  input:
+    notify_target:
+      name: Notification service
+      description: The notify service to call (e.g. notify.mobile_app_your_phone).
+      selector:
+        text: {}
+    category:
+      name: Category filter (optional)
+      description: Only notify for activities in this category. Leave blank to include all categories.
+      default: ""
+      selector:
+        text: {}
+    time:
+      name: Time to check
+      description: When to run the check each day.
+      default: "08:00:00"
+      selector:
+        time: {}
+    title:
+      name: Notification title
+      description: Title of the notification.
+      default: "Overdue activities"
+      selector:
+        text: {}
+
+trigger:
+  - platform: time
+    at: !input time
+
+variables:
+  category_filter: !input category
+
+condition:
+  - condition: template
+    value_template: >
+      {% set activities = states.sensor
+        | selectattr('attributes.integration', 'eq', 'activity_manager')
+        | selectattr('state', 'ne', 'unavailable')
+        | selectattr('state', 'ne', 'unknown')
+        | list %}
+      {% if category_filter != "" %}
+        {% set activities = activities | selectattr('attributes.category', 'eq', category_filter) | list %}
+      {% endif %}
+      {{ activities | selectattr('state', 'lt', now().isoformat()) | list | count > 0 }}
+
+action:
+  - service: !input notify_target
+    data:
+      title: !input title
+      message: >
+        {% set activities = states.sensor
+          | selectattr('attributes.integration', 'eq', 'activity_manager')
+          | selectattr('state', 'ne', 'unavailable')
+          | selectattr('state', 'ne', 'unknown')
+          | list %}
+        {% if category_filter != "" %}
+          {% set activities = activities | selectattr('attributes.category', 'eq', category_filter) | list %}
+        {% endif %}
+        {% set overdue = activities | selectattr('state', 'lt', now().isoformat()) | list %}
+        {% for a in overdue %}
+        - {{ a.name }} ({{ a.state | as_datetime | relative_time }} ago)
+        {% endfor %}

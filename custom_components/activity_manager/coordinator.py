@@ -74,6 +74,11 @@ class ActivityManagerCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
         if os.path.exists(per_entry_path):
             raw = load_json_array(per_entry_path)
         elif os.path.exists(legacy_path):
+            backup_path = legacy_path + ".bak"
+            if not os.path.exists(backup_path):
+                import shutil
+                shutil.copy2(legacy_path, backup_path)
+                _LOGGER.info("Backed up legacy file to %s", backup_path)
             _LOGGER.info(
                 "Migrating activities from legacy file %s to %s",
                 legacy_path,

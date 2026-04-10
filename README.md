@@ -1,10 +1,10 @@
 # activity-manager
 
-Manager recurring tasks from within Home Assistant
+Track recurring activities from within Home Assistant.
 
 Use the companion [Activity Manager Card](https://github.com/pathofleastresistor/activity-manager-card) for the best experience.
 
-The core idea is that an activity happens on a recurring basis, which is stored in the `frequency` field when adding an activity. By default, the activity is last completed when you first add the activity and then the timer can be reset.
+Each activity has a frequency (e.g. every 7 days). The integration tracks when it was last completed and exposes a sensor whose state is the next due datetime. Activities can be overdue, due soon, or on track.
 
 <p align="center">
   <img width="600" src="images/activitymanager.gif">
@@ -12,33 +12,116 @@ The core idea is that an activity happens on a recurring basis, which is stored 
 
 ## Installation
 
-### Manually
-
-Clone or download this repository and copy the "activity_manager" directory to your "custom_components" directory in your config directory
-
-`<config directory>/custom_components/activity-manager/...`
-
 ### HACS
 
 1. Open the HACS section of Home Assistant.
 2. Click the "..." button in the top right corner and select "Custom Repositories."
-3. In the window that opens paste this Github URL.
-4. Select "Integration"
-5. In the window that opens when you select it click om "Install This Repository in HACS"
+3. Paste this repository's GitHub URL, select "Integration", and click Install.
 
-## Usage
+### Manually
 
-Once installed, you can use the link below to add the integration from the UI.
+Copy the `activity_manager` directory into your HA config directory:
+
+```
+<config>/custom_components/activity_manager/
+```
+
+## Setup
+
+Once installed, add the integration from the UI:
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=activity_manager)
 
-If you're using the [Activity Manager Card](https://github.com/pathofleastresistor/activity-manager-card), then you all you need to do is add the Activity Manager Card to your dashboard. When you're creating the card, you'll have to supply a `category` attribute to the card.
+You will be prompted to give the list a name (e.g. "Home", "Garden", "Car"). You can add the integration multiple times to create independent lists.
 
-### Notifications
+### Upgrading from a legacy installation
 
-Because entities are exposed for each activity, you can build custom notifications. The example below runs an automation at sunrise to remind the user if they are past due on workout activities:
+If you have an existing installation (v1.2 or earlier), your data and config entry will be automatically migrated on first startup:
 
-```
+- Your config entry will be renamed to **"Activity Manager"** (the name used by all legacy installs).
+- Your activities will be migrated from `.activities_list.json` to a per-list file. A backup is saved as `.activities_list.json.bak` before migration.
+
+No manual steps required.
+
+## Card
+
+Add the [Activity Manager Card](https://github.com/pathofleastresistor/activity-manager-card) to your dashboard. Use the built-in card editor to:
+
+- Select which activity list to display
+- Optionally filter by category
+- Add, edit, and remove activities directly from the card
+
+## Entities
+
+An entity is created for each activity under `sensor.<list>_<category>_<name>`. The entity state is the datetime when the activity is next due.
+
+Each entity exposes the following attributes:
+
+| Attribute | Description |
+|-----------|-------------|
+| `category` | The activity's category |
+| `last_completed` | ISO datetime of the last completion |
+| `frequency_ms` | Repeat interval in milliseconds |
+| `frequency` | Repeat interval as `{days, hours, minutes}` |
+| `id` | Internal activity ID |
+| `entry_id` | Config entry ID of the list this activity belongs to |
+| `list_title` | Human-readable name of the list |
+
+## Services
+
+### `activity_manager.add_activity`
+
+Add a new activity to a list.
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `list` | Yes | Name of the activity list (e.g. `"Home"`; legacy installs use `"Activity Manager"`) |
+| `name` | Yes | Activity name |
+| `category` | Yes | Category (used for grouping and filtering) |
+| `frequency` | Yes | How often the activity repeats. Either an integer number of seconds, or an object with `days`, `hours`, and/or `minutes` |
+| `last_completed` | No | ISO datetime of last completion. Defaults to now. |
+| `icon` | No | MDI icon name (e.g. `mdi:car`) |
+
+### `activity_manager.update_activity`
+
+Update an existing activity.
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `entity_id` | Yes | Entity ID of the activity to update |
+| `now` | No | Set to `true` to mark the activity as completed right now |
+| `last_completed` | No | ISO datetime to set as the last completion time |
+| `category` | No | New category |
+| `frequency` | No | New frequency (same format as `add_activity`) |
+| `icon` | No | New icon |
+
+### `activity_manager.remove_activity`
+
+Remove an activity permanently.
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `entity_id` | Yes | Entity ID of the activity to remove |
+
+## Notifications
+
+### Blueprint
+
+A ready-made automation blueprint is included. Import it with one click:
+
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fpathofleastresistor%2Factivity-manager%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Factivity_manager_notify.yaml)
+
+Configure:
+- **Notification service** — e.g. `notify.mobile_app_your_phone`
+- **Category filter** — leave blank to notify for all categories
+- **Time** — when to check each day
+- **Title** — notification title
+
+### Custom automations
+
+Because each activity is a sensor entity, you can build your own automations. The example below sends a mobile notification at sunrise listing all overdue workout activities:
+
+```yaml
 service: notify.mobile_android_phone
 data:
   title: >-
@@ -62,8 +145,12 @@ data:
     notification_icon: "mdi:dumbbell"
 ```
 
-### More information
+## Storage
 
--   Activities are stored in .activities_list.json in your `<config>` folder
--   An entity is created for each activity (e.g. `sensor.<category>_<activity>`). The state of the activity is the datetime of when the activity is due. You can use this entity to build notifications or your own custom cards.
--   Three services are exposed: `activity_manager.add_activity`, `activity_manager.update_activity`, `activity_manager.remove_activity`. The update activity can be used to reset the timer.
+Activities are stored in your HA config directory, one file per list:
+
+```
+<config>/.activities_list_<entry_id>.json
+```
+
+Legacy installs stored everything in `.activities_list.json`. This file is automatically migrated on first startup and a `.activities_list.json.bak` backup is kept.

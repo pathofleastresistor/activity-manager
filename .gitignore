@@ -134,4 +134,8 @@ monkeytype.sqlite3
 api-responses/
 *.ignore.*
 .DS_Store
+.claude/
 __pycache__/
+
+# Home Assistant
+.activities_list.json

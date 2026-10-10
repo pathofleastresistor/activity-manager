@@ -4,10 +4,13 @@ from __future__ import annotations
 import logging
 import os
 import uuid
+from datetime import datetime, timedelta
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import Context, HomeAssistant
+from homeassistant.core import Context, HomeAssistant, callback
+from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.helpers.json import save_json
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
@@ -21,6 +24,8 @@ from .const import (
     ATTR_ID,
     ATTR_LAST_COMPLETED,
     ATTR_NAME,
+    CONF_DUE_SOON_HOURS,
+    DEFAULT_DUE_SOON_HOURS,
     DEFAULT_ICON,
     DOMAIN,
     EVENT_UPDATED,
@@ -60,6 +65,69 @@ class ActivityManagerCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
 
         # Set by sensor.async_setup_entry so we can add new entities dynamically.
         self.async_add_entities: AddEntitiesCallback | None = None
+
+        # "Due soon" window used by the summary entities (config entry option).
+        self.due_soon = timedelta(
+            hours=entry.options.get(CONF_DUE_SOON_HOURS, DEFAULT_DUE_SOON_HOURS)
+        )
+        self._track_time = False
+        self._unsub_transition: Callable[[], None] | None = None
+
+    # ------------------------------------------------------------------
+    # Time-based refresh. Summary entities change when an activity becomes
+    # due or overdue even though no data changed, so one timer per list
+    # wakes the listeners at the next such moment.
+    # ------------------------------------------------------------------
+
+    @callback
+    def async_start_time_tracking(self) -> None:
+        """Start waking listeners whenever an activity becomes due or overdue."""
+        self._track_time = True
+        self._schedule_transition()
+
+    @callback
+    def async_stop_time_tracking(self) -> None:
+        """Stop the timer (called on unload)."""
+        self._track_time = False
+        if self._unsub_transition is not None:
+            self._unsub_transition()
+            self._unsub_transition = None
+
+    @callback
+    def _schedule_transition(self) -> None:
+        """(Re)arm the timer for the next due / due-soon boundary."""
+        if not self._track_time:
+            return
+        if self._unsub_transition is not None:
+            self._unsub_transition()
+            self._unsub_transition = None
+        from .summary import due_datetime  # avoid circular import at module level
+
+        now = dt_util.now()
+        boundaries: list[datetime] = []
+        for item in self.data or []:
+            due = due_datetime(item, now)
+            boundaries.append(due)
+            if self.due_soon:
+                boundaries.append(due - self.due_soon)
+        upcoming = [b for b in boundaries if b > now]
+        if upcoming:
+            self._unsub_transition = async_track_point_in_utc_time(
+                self.hass, self._handle_transition, dt_util.as_utc(min(upcoming))
+            )
+
+    @callback
+    def _handle_transition(self, _now: datetime) -> None:
+        """A boundary passed: refresh listeners and arm the next one."""
+        self._unsub_transition = None
+        self.async_update_listeners()
+        self._schedule_transition()
+
+    @callback
+    def async_set_updated_data(self, data: list[dict[str, Any]]) -> None:
+        """Push new data to listeners, then re-arm the timer for the new data."""
+        super().async_set_updated_data(data)
+        self._schedule_transition()
 
     async def async_load(self) -> None:
         """Load activities from disk and push to all listeners."""

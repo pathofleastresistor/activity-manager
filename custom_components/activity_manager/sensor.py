@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -24,6 +24,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import ActivityManagerCoordinator
+from .summary import SummaryEntity, async_setup_summary_platform
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +45,17 @@ async def async_setup_entry(
         for item in (coordinator.data or [])
     ]
     async_add_entities(entities)
+
+    async_setup_summary_platform(
+        config_entry,
+        coordinator,
+        async_add_entities,
+        "sensor",
+        lambda key, name: [
+            SummarySensor(coordinator, metric, key, name) for metric in SUMMARY_METRICS
+        ],
+        SUMMARY_METRICS,
+    )
 
 
 class ActivityEntity(CoordinatorEntity[ActivityManagerCoordinator], SensorEntity):
@@ -125,3 +137,45 @@ class ActivityEntity(CoordinatorEntity[ActivityManagerCoordinator], SensorEntity
             "entry_id": self.coordinator.entry_id,
             "list_title": self.coordinator.title,
         }
+
+
+SUMMARY_METRICS = ("due_count", "overdue_count", "next_due")
+
+
+class SummarySensor(SummaryEntity, SensorEntity):
+    """Due count, overdue count or next due date for a list or one category."""
+
+    def __init__(self, coordinator, metric, cat_key=None, cat_name=None) -> None:
+        """Initialize the sensor and its classes for the given metric."""
+        super().__init__(coordinator, metric, cat_key, cat_name)
+        if metric == "next_due":
+            self._attr_device_class = SensorDeviceClass.TIMESTAMP
+            self._attr_icon = "mdi:calendar-clock"
+        else:
+            self._attr_state_class = SensorStateClass.MEASUREMENT
+            self._attr_icon = (
+                "mdi:alert-circle-outline" if metric == "overdue_count" else "mdi:clipboard-list-outline"
+            )
+
+    @property
+    def native_value(self) -> int | datetime | None:
+        """Return the count, or the earliest due datetime (None when empty)."""
+        summary = self.summary
+        if self._metric == "due_count":
+            return summary.due_count
+        if self._metric == "overdue_count":
+            return summary.overdue_count
+        return summary.next_due
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Add the activity names behind the number."""
+        attrs = super().extra_state_attributes
+        summary = self.summary
+        if self._metric == "due_count":
+            attrs["activities"] = summary.due
+        elif self._metric == "overdue_count":
+            attrs["activities"] = summary.overdue
+        else:
+            attrs["activity"] = summary.next_due_name
+        return attrs

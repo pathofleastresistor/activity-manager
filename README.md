@@ -67,6 +67,41 @@ Each entity exposes the following attributes:
 | `entry_id` | Config entry ID of the list this activity belongs to |
 | `list_title` | Human-readable name of the list |
 
+### Summary entities
+
+Each list also gets a device (named after the list) with aggregate entities for the **whole list** and for **each category** in it. They are what a dashboard tile or an automation should use; you no longer need to template over the per-activity sensors.
+
+For a list named `Home` with a category `Workout`:
+
+| Entity | State | Notes |
+|--------|-------|-------|
+| `sensor.home_due` | number of due activities | Due = overdue, or due within the "due soon" window. Attribute `activities` lists their names. |
+| `sensor.home_overdue` | number of overdue activities | Attribute `activities` lists their names. |
+| `sensor.home_next_due` | timestamp of the earliest due date | In the past while something is overdue; `unknown` when the list is empty. Attribute `activity` is its name. |
+| `binary_sensor.home_has_due_activities` | `on` when any activity is due or overdue | Attribute `activities` lists their names. |
+| `sensor.home_workout_due`, `sensor.home_workout_overdue`, `sensor.home_workout_next_due`, `binary_sensor.home_workout_has_due_activities` | the same, for the `Workout` category | |
+
+- Entity IDs come from the list name and category name, so yours will differ. Unique IDs are stable (`<entry_id>_summary_<scope>_<metric>`), so renaming an entity in the UI survives reloads.
+- Category entities are created automatically when the first activity with a new category is added, and removed when the last activity in that category is deleted or moved. Categories are matched ignoring case (`Workout` and `workout` are one category). Activities without a category count towards the list only.
+- Counts update when an activity is added, edited, completed or removed, and also at the moment an activity becomes due or overdue.
+- The "due soon" window defaults to 24 hours. Change it per list under **Settings → Devices & services → Activity Manager → Configure** (0 makes "due" mean "overdue").
+- These entities are for the whole list, not across lists. If you have several lists, each has its own device and entities.
+- They deliberately do not have the `integration` attribute that per-activity sensors have, so existing templates and the notification blueprint that select on it are unaffected.
+
+Example: notify when anything in the `Workout` category is overdue.
+
+```yaml
+trigger:
+  - platform: numeric_state
+    entity_id: sensor.home_workout_overdue
+    above: 0
+action:
+  - service: notify.mobile_app_your_phone
+    data:
+      title: Workout reminder
+      message: "{{ state_attr('sensor.home_workout_overdue', 'activities') | join(', ') }}"
+```
+
 ## Services
 
 ### `activity_manager.add_activity`
@@ -119,7 +154,7 @@ Configure:
 
 ### Custom automations
 
-Because each activity is a sensor entity, you can build your own automations. The example below sends a mobile notification at sunrise listing all overdue workout activities:
+Because each activity is a sensor entity (and each list has the summary entities above), you can build your own automations. The example below sends a mobile notification at sunrise listing all overdue workout activities:
 
 ```yaml
 service: notify.mobile_android_phone

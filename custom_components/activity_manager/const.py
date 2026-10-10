@@ -8,7 +8,7 @@ ENTRY_VERSION = 1
 ENTRY_MINOR_VERSION = 3
 
 # Platforms
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "binary_sensor"]
 
 # Websocket command types
 WS_ITEMS = "activity_manager/items"
@@ -34,3 +34,7 @@ ATTR_LAST_COMPLETED = "last_completed"
 ATTR_ICON = "icon"
 
 DEFAULT_ICON = "mdi:checkbox-outline"
+
+# Options
+CONF_DUE_SOON_HOURS = "due_soon_hours"
+DEFAULT_DUE_SOON_HOURS = 24

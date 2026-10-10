@@ -112,7 +112,18 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
+    # Wake the summary entities when an activity becomes due or overdue.
+    coordinator.async_start_time_tracking()
+    config_entry.async_on_unload(coordinator.async_stop_time_tracking)
+    # Reload on rename / "due soon" changes so devices and counts follow.
+    config_entry.async_on_unload(config_entry.add_update_listener(_async_options_updated))
+
     return True
+
+
+async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload the entry when its title or options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

@@ -8,7 +8,13 @@ from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.util import slugify
 
-from .const import DOMAIN, ENTRY_MINOR_VERSION, ENTRY_VERSION
+from .const import (
+    CONF_DUE_SOON_HOURS,
+    DEFAULT_DUE_SOON_HOURS,
+    DOMAIN,
+    ENTRY_MINOR_VERSION,
+    ENTRY_VERSION,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -70,18 +76,28 @@ class ActivityManagerOptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options for Activity Manager."""
 
     async def async_step_init(self, user_input=None):
-        """Allow renaming the activity list."""
+        """Allow renaming the list and setting its "due soon" window."""
         if user_input is not None:
             name = user_input["name"].strip()
             if name and name != self.config_entry.title:
                 self.hass.config_entries.async_update_entry(
                     self.config_entry, title=name
                 )
-            return self.async_create_entry(data={})
+            return self.async_create_entry(
+                data={CONF_DUE_SOON_HOURS: user_input[CONF_DUE_SOON_HOURS]}
+            )
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
-                {vol.Required("name", default=self.config_entry.title): str}
+                {
+                    vol.Required("name", default=self.config_entry.title): str,
+                    vol.Required(
+                        CONF_DUE_SOON_HOURS,
+                        default=self.config_entry.options.get(
+                            CONF_DUE_SOON_HOURS, DEFAULT_DUE_SOON_HOURS
+                        ),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=0, max=8760)),
+                }
             ),
         )

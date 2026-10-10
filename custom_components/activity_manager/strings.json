@@ -20,10 +20,44 @@
   "options": {
     "step": {
       "init": {
-        "title": "Rename Activity List",
+        "title": "Activity List Options",
         "data": {
-          "name": "List name"
+          "name": "List name",
+          "due_soon_hours": "\"Due soon\" window (hours)"
+        },
+        "data_description": {
+          "due_soon_hours": "Activities due within this many hours count as due in the summary sensors. 0 counts only overdue activities."
         }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "due_count": {
+        "name": "Due"
+      },
+      "overdue_count": {
+        "name": "Overdue"
+      },
+      "next_due": {
+        "name": "Next due"
+      },
+      "category_due_count": {
+        "name": "{category} due"
+      },
+      "category_overdue_count": {
+        "name": "{category} overdue"
+      },
+      "category_next_due": {
+        "name": "{category} next due"
+      }
+    },
+    "binary_sensor": {
+      "has_due": {
+        "name": "Has due activities"
+      },
+      "category_has_due": {
+        "name": "{category} has due activities"
       }
     }
   }
